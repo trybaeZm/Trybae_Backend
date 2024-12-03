@@ -9,28 +9,31 @@ require("dotenv").config();
 const app = express();
 
 // Socket.io
-const server = require("http").createServer(app);
+  const server = require("http").createServer(app);
 
-const io = socketIo(server, {
-  cors: {
-    origin: "*",
-  },
-});
-
-app.io = io;
-
-io.on("connection", (socket) => {
-  console.log("New client connected");
-
-  // When the payment is done, emit an event to the client
-  socket.on("paymentDone", () => {
-    io.sockets.emit("paymentUpdate", { done: true });
+  const io = socketIo(server, {
+    cors: {
+      origin: "*",
+    },
   });
 
-  socket.on("disconnect", () => {
-    console.log("Client disconnected");
+  app.io = io;
+
+  io.on("connection", (socket) => {
+    console.log("New client connected");
+
+    // When the payment is done, emit an event to the client
+    socket.on("paymentDone", () => {
+      io.sockets.emit("paymentUpdate", { done: true });
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Client disconnected");
+    });
   });
-});
+// 
+
+
 const limiter = rateLimit({
   windowMs: 3 * 60 * 1000, // 3 minutes
   max: 150, // Limit each IP to 150 requests
@@ -50,40 +53,45 @@ app.use(
 
 app.set("trust proxy", 1); // to trust loadbalancers like nginx so that, that ip doesn`t get limited.
 app.use(morgan("dev"));
-const userauthRouter = require("./routers/userauth_router");
-const hostauthRouter = require("./routers/hostauth_router");
-const adminauthRouter = require("./routers/adminauth_router");
-const ticketRouter = require("./routers/ticket_router");
-const eventRouter = require("./routers/events_router");
-const storyRouter = require("./routers/story_posts_router");
-const userInterestRouter = require("./routers/user_interest_router");
-const followerRouter = require("./routers/followers");
-const transactionRouter = require("./routers/transactions");
-const searchRouter = require("./routers/search_router");
-const fetchProfileRouter = require("./routers/fetchprofile_router");
-const cinemaRouter = require("./routers/cinema_router");
-const paymentRouter = require("./routers/payment.routes");
-const dashboardRouter = require("./routers/dashboard");
-const couponsRouter = require("./routers/coupons_router");
 
-app.use("/userauth", limiter, userauthRouter);
-app.use("/hostauth", limiter, hostauthRouter);
-app.use("/tickets", limiter, ticketRouter);
-app.use("/events", limiter, eventRouter);
-app.use("/stories", limiter, storyRouter);
-app.use("/userinterests", limiter, userInterestRouter);
-app.use("/followers", limiter, followerRouter);
-app.use("/transactions", limiter, transactionRouter);
-app.use("/search", limiter, searchRouter);
-app.use("/tbadmins", limiter, adminauthRouter);
-app.use("/profiles", limiter, fetchProfileRouter);
-app.use("/cinemas", limiter, cinemaRouter);
-app.use("/payments", limiter, paymentRouter);
-app.use("/dashboard", limiter, dashboardRouter);
-app.use("/coupons", limiter, couponsRouter);
+const userauthRouter = require("./routers/userauth_router");
+// const hostauthRouter = require("./routers/hostauth_router");
+// const adminauthRouter = require("./routers/adminauth_router");
+// const ticketRouter = require("./routers/ticket_router");
+// const eventRouter = require("./routers/events_router");
+// const storyRouter = require("./routers/story_posts_router");
+// const userInterestRouter = require("./routers/user_interest_router");
+// const followerRouter = require("./routers/followers");
+// const transactionRouter = require("./routers/transactions");
+// const searchRouter = require("./routers/search_router");
+// const fetchProfileRouter = require("./routers/fetchprofile_router");
+// const cinemaRouter = require("./routers/cinema_router");
+// const paymentRouter = require("./routers/payment.routes");
+// const dashboardRouter = require("./routers/dashboard");
+// const couponsRouter = require("./routers/coupons_router");
+
+app.use("/userauth", userauthRouter);
+// app.use("/hostauth", limiter, hostauthRouter);
+// app.use("/tickets", limiter, ticketRouter);
+// app.use("/events", limiter, eventRouter);
+// app.use("/stories", limiter, storyRouter);
+// app.use("/userinterests", limiter, userInterestRouter);
+// app.use("/followers", limiter, followerRouter);
+// app.use("/transactions", limiter, transactionRouter);
+// app.use("/search", limiter, searchRouter);
+// app.use("/tbadmins", limiter, adminauthRouter);
+// app.use("/profiles", limiter, fetchProfileRouter);
+// app.use("/cinemas", limiter, cinemaRouter);
+// app.use("/payments", limiter, paymentRouter);
+// app.use("/dashboard", limiter, dashboardRouter);
+// app.use("/coupons", limiter, couponsRouter);
 
 // Test
-app.get("/appcheck", limiter, (req, res) => {
+
+app.get("/appcheck", limiter, (req, res)=>{
+  res.send(200)
+})
+app.get("/s", limiter, (req, res) => {
   return res.send(
     `<body style='background-color: #000'><h1 style='color: white'>All services running ✅</h1></body>`
   );

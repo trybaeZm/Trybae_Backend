@@ -1,17 +1,29 @@
 const Model = require("../models/TryBae_db");
 
 // Select all banned hosts
-function getAllBannedHosts(req, res) {
-	Model.connection.query(
-		"SELECT * FROM Banned_hosts",
-		function (error, results) {
-			if (error) {
-				res.send({ status: "FAILURE", message: "Unknown error" });
-			} else {
-				res.send({ status: "SUCCESS", results: results });
-			}
-		},
-	);
+async function getAllBannedHosts(req, res) {
+
+	let { data: Banned_hosts, error } = await supabase
+	.from('Banned_hosts')
+	.select('ban_ID')
+
+	if(error){
+		console.log(err)
+	}
+
+
+
+	// old code
+	// Model.connection.query(
+	// 	"SELECT * FROM Banned_hosts",
+	// 	function (error, results) {
+	// 		if (error) {
+	// 			res.send({ status: "FAILURE", message: "Unknown error" });
+	// 		} else {
+	// 			res.send({ status: "SUCCESS", results: results });
+	// 		}
+	// 	},
+	// );
 }
 
 // Select banned host by ID

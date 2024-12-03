@@ -1,15 +1,9 @@
-const mysql = require("mysql2");
+const { createClient } =  require('@supabase/supabase-js')
 
-const uri =
-  process.env.MODE == "TEST"
-    ? process.env.SQL_DATABASE_URL_TEST
-    : process.env.SQL_DATABASE_URL_PROD;
+const supabaseUrl = 'https://zdyzvvhqlrjxefykdgmf.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-const connection = mysql.createConnection(uri);
-
-connection.connect((err) => {
-  if (err) console.log("Error connecting to sql DB ❌", err);
-  else console.log("Connection to sql DB Successful! ✅");
-});
-
-module.exports = { connection };
+module.exports = {
+    supabase
+}
