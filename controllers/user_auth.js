@@ -159,13 +159,6 @@ const getUserByUsername = async (username) => {
     
   }
 
-  const query = `SELECT * FROM users WHERE username = ?`;
-  Model.connection.query(query, [username], (error, results) => {
-    if (error) {
-      return cb(error);
-    }
-    cb(null, results[0]);
-  });
 };
 
 // const update_push_token = (req, res) => {
