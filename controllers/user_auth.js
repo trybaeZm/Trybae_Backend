@@ -11,16 +11,16 @@ const { el } = require("date-fns/locale");
 
 require("dotenv").config();
 
-// const transport = nodemailer.createTransport({
-//   host: "smtp.gmail.com",
-//   port: 587,
-//   auth: {
-//     user: process.env.EMAIL,
-//     pass: process.env.PASSWORD,
-//   },
-// });
+const transport = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 587,
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.PASSWORD,
+  },
+});
 
-// const SALT_ROUNDS = 10;
+const SALT_ROUNDS = 10;
 
 // const calculateAge = (dob) => {
 //   const today = new Date();
@@ -40,458 +40,511 @@ const createUser = async (
   password,
   phone,
   DOB,
-  location
+  location,
+  cb
 ) => {
 
-  const { data, error } = await supabase
-  .from('users')
-  .insert([
-    { 
-      username: username,
-      full_name: fullname,
-      email: email,
-      password: password,
-      phone_number: phone,
-      date_of_birt: DOB,
-      location: location
-     },
-  ])
-  .select()
-
-  if(error){
-    console.log(error)
-    return false
+  bcrypt.hash(password, SALT_ROUNDS, async (err, hashedPassword) => {
+    if (err) {
+       console.log(err);
+    }
+    console.log("password hashsed",hashedPassword)
+    const { data, error } = await supabase
+    .from('users')
+    .insert([
+      {
+        username: username,
+        full_name: fullname,
+        email: email,
+        password: hashedPassword,
+        phone_number: phone,
+        date_of_birt: DOB,
+        location: location
+       },
+    ])
+    .select()
+    if(error){
+      console.log(error)
+      return cb(error);
+    }
+    if(data){
+      // console.log("ok",data)
+      cb(null, data);
+    }
   }
-  if(data){
-    console.log("ok",data)
-    return true
-  }
-
-  // bcrypt.hash(password, SALT_ROUNDS, (err, hashedPassword) => {
-  //   if (err) {
-  //     return cb(err);
-  //   }
-
-    
-
-
-  //   // old code
-  //   const query = `INSERT INTO users (username, fullname, DOB, age, email, password, phone, location, Expo_push_token) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  //   Model.connection.query(
-  //     query,
-  //     [
-  //       username,
-  //       fullname,
-  //       DOB,
-  //       calculateAge(DOB),
-  //       email,
-  //       hashedPassword,
-  //       phone,
-  //       JSON.stringify(location),
-  //       Expo_push_token,
-  //     ],
-  //     (error, results) => {
-  //       if (error) {
-  //         console.log(new Date());
-  //         return cb(error);
-  //       }
-  //       cb(null, results);
-  //     }
-  //   );
-  // });
-
-
+  )
 };
 
-// const getUserByEmail = async () => {
+const getuserData = async (req, res) => {
+  const username = req.decoded["username"];
 
-// }
+  // ALL fields except password...
+  // const query = `SELECT username, fullname, DOB, email, age, phone, location, profile_pic_url, follower_count, 
+	// email_verified, phone_verified, private_profile FROM users WHERE username = ?`;
 
-// const getuserData = (req, res) => {
-//   const username = req.decoded["username"];
+  const {error, data} = await supabase
 
-//   // ALL fields except password...
-//   const query = `SELECT username, fullname, DOB, email, age, phone, location, profile_pic_url, follower_count, 
-// 	email_verified, phone_verified, private_profile FROM users WHERE username = ?`;
+  .from('users')
+  .select('username, fullname, DOB, email, age, phone, location, profile_pic_url, follower_count, email_verified, phone_verified, private_profile')
+  .eq('username', username)
 
-//   Model.connection.query(query, [username], (error, results) => {
-//     if (error) {
-//       return res.send({ error: error });
-//     }
-//     if (results) {
-//       return res.send({ user: results[0] });
-//     } else {
-//       return res.send({ error: "no user found" });
-//     }
-//   });
-// };
+    if (error) {
+      return res.send({ error: error });
+    }
 
-const getUserByEmail = async (email) => {
-  console.log(email)
-  const {data, error} = await supabase
+    if (data) {
+      return res.send({ user: data[0] });
+    } else {
+      return res.send({ error: "no user found" });
+    }
+};
+
+const getUserByEmail = async (email, callback) => {
+  const {error, data} = await supabase
   .from('users')
   .select()
   .eq('email', email)
 
   if(error){
     console.log(error)
-    return false
+    callback(error, null)
   }
 
   if(data){
-    if(data.length > 0){
-      console.log("Email is already in use")
-      return true
-    } else {
-      console.log("Email is not in use")
-      return false
-    }
+    console.log(data)
+    callback(null, data[0])
   }
 };
 
-const getUserByUsername = async (username) => {
+const getUserByUsername = async (username, callback) => {
   const {data, error} = await supabase
   .from('users')
   .select()
   .eq('username', username)
 
-  if(data.length > 0){
-    
+  if(error){
+    callback(error, null)
+  }
+
+  if(data){
+    callback(null,data[0])
+    console.log(data[0])
   }
 
 };
 
-// const update_push_token = (req, res) => {
-//   const username = req.decoded["username"];
+const update_push_token = async (req, res) => {
+  const username = req.decoded["username"];
 
-//   const { Expo_push_token } = req.body;
+  const { Expo_push_token } = req.body;
 
-//   const query = `UPDATE users SET Expo_push_token = ? WHERE username = ?`;
 
-//   try {
-//     Model.connection.query(
-//       query,
-//       [Expo_push_token, username],
-//       (err, result) => {
-//         if (!err && result) {
-//           return res.send({
-//             status: "SUCCESS",
-//             message: "Success",
-//           });
-//         } else {
-//           return res.send({
-//             status: "FAILURE",
-//             message: "Unknown error occured",
-//           });
-//         }
-//       }
-//     );
-//   } catch (error) {
-//     res.json({
-//       status: "FAILED",
-//       message: "Unknown error, try later.",
-//     });
-//   }
-// };
+  const {error, data} = await supabase
+  .from('users')
+  .update({Expo_push_token: Expo_push_token})
+  .eq('username', username)
 
-// const change_to_private_profile = (req, res) => {
-//   const username = req.decoded["username"];
+  if(error){
+    return res.send({
+      status: "FAILURE",
+      message: "Unknown error occured",
+    })
+  }
 
-//   const { option } = req.body;
+  if(data){
+    return res.send({
+      status: "SUCCESS",
+      message: "Success",
+    })
+  }
 
-//   const query = `UPDATE users SET private_profile = ? WHERE username = ?`;
 
-//   try {
-//     Model.connection.query(query, [option, username], (err, result) => {
-//       if (!err && result) {
-//         return res.send({
-//           status: "SUCCESS",
-//           message: "Profile viewing settings updated",
-//         });
-//       } else {
-//         return res.send({
-//           status: "FAILURE",
-//           message: "Unknown error occured",
-//         });
-//       }
-//     });
-//   } catch (error) {
-//     res.json({
-//       status: "FAILED",
-//       message: "Unknown error, try later.",
-//     });
-//   }
-// };
+  // const query = `UPDATE users SET Expo_push_token = ? WHERE username = ?`;
 
-// const login = (req, res) => {
-//   const { login, password, type, appkey, Expo_push_token = null } = req.body;
+  // try {
+  //   Model.connection.query(
+  //     query,
+  //     [Expo_push_token, username],
+  //     (err, result) => {
+  //       if (!err && result) {
+  //        ;
+  //       } else {
+  //         ;
+  //       }
+  //     }
+  //   );
+  // } catch (error) {
+  //   res.json({
+  //     status: "FAILED",
+  //     message: "Unknown error, try later.",
+  //   });
+  // }
+};
 
-//   if (appkey != process.env.APP_KEY) {
-//     return res.send({
-//       status: "FAILURE",
-//       message: "Could not verify integrity of application...",
-//     });
-//   }
+const change_to_private_profile = (req, res) => {
+  const username = req.decoded["username"];
 
-//   if (!login || !password || !type) {
-//     return res.send({
-//       status: "FAILURE",
-//       message: "One or more fields missing",
-//     });
-//   }
+  const { option } = req.body;
 
-//   console.log(login, login.length, "login");
-//   if (type == "username") {
-//     getUserByUsername(login, (err, user) => {
-//       if (err) {
-//         return res.send({ message: "Error getting user", auth: false });
-//       }
-//       if (!user) {
-//         return res.send({ message: "User not found", auth: false });
-//       }
+  const query = `UPDATE users SET private_profile = ? WHERE username = ?`;
 
-//       if (user) {
-//         BAN_CONTROLLER.getBannedUserByUsername(
-//           user.username,
-//           function (results) {
-//             if (results.length <= 0) {
-//               bcrypt.compare(password, user.password, (error, result) => {
-//                 if (result && !error) {
-//                   const refreshToken = middleware.generateRefreshToken(
-//                     user.username
-//                   );
+  try {
+    Model.connection.query(query, [option, username], (err, result) => {
+      if (!err && result) {
+        return res.send({
+          status: "SUCCESS",
+          message: "Profile viewing settings updated",
+        });
+      } else {
+        return res.send({
+          status: "FAILURE",
+          message: "Unknown error occured",
+        });
+      }
+    });
+  } catch (error) {
+    res.json({
+      status: "FAILED",
+      message: "Unknown error, try later.",
+    });
+  }
+};
 
-//                   if (refreshToken == false) {
-//                     return res.send({
-//                       message: "Error creating token!",
-//                       auth: false,
-//                     });
-//                   }
+const login = async (req, res) => {
+  const { login, password, type, appkey, Expo_push_token} = req.body;
+  console.log(req.body)
 
-//                   if (Expo_push_token !== null) {
-//                     if (Expo.isExpoPushToken(Expo_push_token)) {
-//                       updateUserQuery(
-//                         "Expo_push_token",
-//                         Expo_push_token,
-//                         user.username
-//                       );
-//                     }
-//                   }
+  if (appkey != process.env.APP_KEY) {
+    return res.send({
+      status: "FAILURE",
+      message: "Could not verify integrity of application...",
+    });
+  }
 
-//                   return res.send({
-//                     token: middleware.createJWTtoken(user.username),
-//                     refreshToken: refreshToken,
-//                     account_status: user.email_verified,
-//                     username: user.username,
-//                     phone_number: user.phone,
-//                   });
-//                 } else {
-//                   return res.send({
-//                     status: "FAILURE",
-//                     message: "Incorrect password",
-//                     auth: false,
-//                   });
-//                 }
-//               });
-//             } else {
-//               return res.send({
-//                 message: "This user is banned...",
-//                 ispermanent: results[0].permanent == 0 ? false : true,
-//                 ban_period_in_days: results[0].ban_period_in_days,
-//               });
-//             }
-//           }
-//         );
-//       }
-//     });
-//   } else {
-//     //console.log(email, password)
-//     getUserByEmail(login, (err, user) => {
-//       if (err) {
-//         return res.send({ message: "Error getting user", auth: false });
-//       }
-//       if (!user) {
-//         return res.send({ message: "User not found", auth: false });
-//       }
-//       if (user) {
-//         BAN_CONTROLLER.getBannedUserByUsername(
-//           user.username,
-//           function (results) {
-//             if (results.length <= 0) {
-//               bcrypt.compare(password, user.password, (error, result) => {
-//                 if (result && !error) {
-//                   const refreshToken = middleware.generateRefreshToken(
-//                     user.username
-//                   );
+  if (!login || !password || !type) {
+    return res.send({
+      status: "FAILURE",
+      message: "One or more fields missing",
+    });
+  }
 
-//                   if (refreshToken == false) {
-//                     return res.send({
-//                       message: "Error creating refresh token!",
-//                       auth: false,
-//                     });
-//                   }
+  console.log(login, login.length, "login");
 
-//                   if (Expo.isExpoPushToken(Expo_push_token)) {
-//                     updateUserQuery(
-//                       "Expo_push_token",
-//                       Expo_push_token,
-//                       user.username
-//                     );
-//                   }
+  if (type == "username") {
+    let usernamedata = await getUserByUsername(login,
+       (err, user) => {
+      if (err) {
+        return res.send({ message: "Error getting user", auth: false });
+      }
 
-//                   return res.send({
-//                     token: middleware.createJWTtoken(user.username),
-//                     refreshToken: refreshToken,
-//                     account_status: user.email_verified,
-//                     username: user.username,
-//                     phone_number: user.phone,
-//                   });
-//                 } else {
-//                   return res.send({
-//                     status: "FAILURE",
-//                     message: "Incorrect password",
-//                     auth: false,
-//                   });
-//                 }
-//               });
-//             } else {
-//               return res.send({
-//                 message: "This user is banned...",
-//                 ispermanent: results[0].permanent == 0 ? false : true,
-//                 ban_period_in_days: results[0].ban_period_in_days,
-//               });
-//             }
-//           }
-//         );
-//       }
-//     });
-//   }
-// };
+      if (!user) {
+        return res.send({ message: "User not found", auth: false });
+      }     
+    }
+  );
+  
 
-// const refresh = async (req, res) => {
-//   const refreshToken = req.body.refreshToken;
-//   const username = req.body.username;
+  if (usernamedata) {
+    BAN_CONTROLLER.getBannedUserByUsername(
+      user.username,
+      function (results) {
+        if (results.length <= 0) {
+          bcrypt.compare(password, user.password, (error, result) => {
+            if (result && !error) {
+              const refreshToken = middleware.generateRefreshToken(
+                user.username
+              );
 
-//   if (!refreshToken || refreshToken == undefined) {
-//     return res.send({ message: "No Token Provided!" });
-//   }
-//   await middleware.verifyRefreshToken(refreshToken, username, res);
-// };
+              if (refreshToken == false) {
+                return res.send({
+                  message: "Error creating token!",
+                  auth: false,
+                });
+              }
+
+              if (Expo_push_token !== null) {
+                if (Expo.isExpoPushToken(Expo_push_token)) {
+                  updateUserQuery(
+                    "Expo_push_token",
+                    Expo_push_token,
+                    user.username
+                  );
+                }
+              }
+
+              console.log(user)
+
+              return res.send({
+                token: middleware.createJWTtoken(user.username),
+                refreshToken: refreshToken,
+                account_status: user.email_verification_status,
+                username: user.username,
+                phone_number: user.phone,
+              });
+            } else {
+              return res.send({
+                status: "FAILURE",
+                message: "Incorrect password",
+                auth: false,
+              });
+            }
+          });
+        } else {
+          return res.send({
+            message: "This user is banned...",
+            ispermanent: results[0].permanent == 0 ? false : true,
+            ban_period_in_days: results[0].ban_period_in_days,
+          });
+        }
+      }
+    );
+  }
+
+  } else {
+    // console.log(email, password)
+    getUserByEmail(login, (err, user) => {
+      if (err) {
+        return res.send({ message: "Error getting user", auth: false });
+      }
+
+      if (!user) {
+        return res.send({ message: "User not found", auth: false });
+      }
+
+      if (user) {
+        console.log(user)
+        BAN_CONTROLLER.getBannedUserByUsername(
+          user.username,
+          function (results) {
+            if (results.length <= 0) {
+
+              bcrypt.compare(password, user.password, (error, result) => {
+
+                if (result && !error) {
+                  const refreshToken = middleware.generateRefreshToken(
+                    user.username
+                  );
+
+                  if (refreshToken == false) {
+                    return res.send({
+                      message: "Error creating refresh token!",
+                      auth: false,
+                    });
+                  }
+                  console.log(Expo_push_token)
+                  // if (Expo.isExpoPushToken(Expo_push_token)) {
+                  //   updateUserQuery(
+                  //     "Expo_push_token",
+                  //     Expo_push_token,
+                  //     user.username
+                  //   );
+                  // }
+
+                  return res.send({
+                    token: middleware.createJWTtoken(user.username),
+                    refreshToken: refreshToken,
+                    account_status: user.email_verification_status,
+                    username: user.username,
+                    phone_number: user.phone,
+                  });
+                } else {
+                  return res.send({
+                    status: "FAILURE",
+                    message: "Incorrect password",
+                    auth: false,
+                  });
+                }
+              });
+            } else {
+              return res.send({
+                message: "This user is banned...",
+                ispermanent: results[0].permanent == 0 ? false : true,
+                ban_period_in_days: results[0].ban_period_in_days,
+              });
+            }
+          }
+        );
+      }
+    });
+  }
+};
+
+const refresh = async (req, res) => {
+  const refreshToken = req.body.refreshToken;
+  const username = req.body.username;
+
+  if (!refreshToken || refreshToken == undefined) {
+    return res.send({ message: "No Token Provided!" });
+  }
+  await middleware.verifyRefreshToken(refreshToken, username, res);
+};
 
 const signup = async (req, res) => {
   const {fullname,username,email,password,phone,DOB,location} = req.body;
-  let emailAvailability = await getUserByEmail(email)
-  if(emailAvailability){
-    res.send(400, {msg: "email is already in use"})
-  } else {
-    let value = createUser(
-      fullname,
-      username.toLowerCase(),
-      email.toLowerCase(),
-      password,
-      phone,
-      DOB,
-      location);
+  getUserByEmail(email.toLowerCase(), (error, user) => {
 
-    if (value) {
-      res.send("success")
-    } else (
-      res.send("falied")
-    )
+    if (error) {
+      console.log(err, "error");
+      res.send({
+        status: "FAILURE",
+        message: "Error looking up user",
+        code: "101",
+      });
+    }
+    if (!user) {
+      getUserByUsername(username.toLowerCase(), (error, user) => {
+
+        if (error) {
+          console.log(error, "error");
+          res.send({
+            status: "FAILURE",
+            message: "Error looking up user",
+            code: "102",
+          });
+        }
+
+        if (!user) {
+          // res.send("ok its there")
+          createUser(
+            fullname,
+            username.toLowerCase(),
+            email.toLowerCase(),
+            password,
+            phone,
+            DOB,
+            location
+            ,
+            (err, result) => {
+              if (err != null) {
+                return res.send({
+                  status: "FAILURE",
+                  message: "Unknown error",
+                });
+              } else {
+                console.log("this was a success",result);
+                sendOTPVerificationEmail(req.body);
+                return res.send({
+                  status: "SUCCESS",
+                  message: "Account created successfully",
+                });
+              }
+            }
+          );
+        } else {
+          res.send({
+            status: "FAILURE",
+            message: "Username already exists",
+          });
+        }
+      });
+    
+    } else {
+      res.send({ status: "FAILURE", message: "Email already exists" });
+    }
+  });
+};
+
+const upload_profile_pic = (req, res) => {
+  const upload = createMulter(
+    "public-read",
+    "Profile Pics/users",
+    "profile_pic_image",
+    "jpg"
+  );
+  try {
+    upload.single("image")(req, res, (err) => {
+      if (err) {
+        console.log(err);
+        return res.send({ status: "FAILURE", message: `Disallowed file type` });
+      }
+      if (req.file && req.decoded["username"]) {
+        updateUserQuery(
+          "profile_pic_url",
+          req.file.location,
+          req.decoded["username"]
+        );
+        return res.send({ status: "SUCCESS", imageURL: req.file.location });
+      } else {
+        return res.send({
+          status: "FAILURE",
+          message: "No image or username provided in the request",
+        });
+      }
+    });
+  } catch (err) {
+    // Handle the error and return a response
+    return res.send({ status: "FAILURE", message: `Unknown error` });
   }
 };
 
-// const upload_profile_pic = (req, res) => {
-//   const upload = createMulter(
-//     "public-read",
-//     "Profile Pics/users",
-//     "profile_pic_image",
-//     "jpg"
-//   );
-//   try {
-//     upload.single("image")(req, res, (err) => {
-//       if (err) {
-//         console.log(err);
-//         return res.send({ status: "FAILURE", message: `Disallowed file type` });
-//       }
-//       if (req.file && req.decoded["username"]) {
-//         updateUserQuery(
-//           "profile_pic_url",
-//           req.file.location,
-//           req.decoded["username"]
-//         );
-//         return res.send({ status: "SUCCESS", imageURL: req.file.location });
-//       } else {
-//         return res.send({
-//           status: "FAILURE",
-//           message: "No image or username provided in the request",
-//         });
-//       }
-//     });
-//   } catch (err) {
-//     // Handle the error and return a response
-//     return res.send({ status: "FAILURE", message: `Unknown error` });
-//   }
-// };
+async function updateUserQuery(field, value, username) {
+  // console.log({`${field}` : value})
+  
+  const {error, data} = await supabase
+  .from('users')
+  .update({[field]:value})
+  .eq('username', username)
+  
+  if(error){
+    throw error
+  }
+  // Model.connection.query(
+  //   "UPDATE users SET ?? = ? WHERE username = ?",
+  //   [field, value, username],
+  //   function (err, results) {
+  //     if (err) throw err;
+  //   }
+  // );
+}
 
-// function updateUserQuery(field, value, username) {
-//   Model.connection.query(
-//     "UPDATE users SET ?? = ? WHERE username = ?",
-//     [field, value, username],
-//     function (err, results) {
-//       if (err) throw err;
-//     }
-//   );
-// }
+const saveOTP = async (user, otp) => {
+  // hash the otp
+  const saltRounds = 10;
 
-// const saveOTP = async (user, otp) => {
-//   // hash the otp
-//   const saltRounds = 10;
+  const hashedOTP = await bcrypt.hash(otp, saltRounds);
 
-//   const hashedOTP = await bcrypt.hash(otp, saltRounds);
+  await mongodb.UserEmailOTPVerification.deleteMany({ userId: user.username }); // Clear previous otps
 
-//   await mongodb.UserEmailOTPVerification.deleteMany({ userId: user.username }); // Clear previous otps
+  const newOTPVerification = mongodb.UserEmailOTPVerification({
+    userId: user.username,
+    otp: hashedOTP,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 200000, // 3 min
+  });
 
-//   const newOTPVerification = mongodb.UserEmailOTPVerification({
-//     userId: user.username,
-//     otp: hashedOTP,
-//     createdAt: Date.now(),
-//     expiresAt: Date.now() + 200000, // 3 min
-//   });
+  // save otp record
+  try {
+    await newOTPVerification.save();
+    console.log("otp saved");
+  } catch {
+    console.log("error sending");
+  }
+};
 
-//   // save otp record
-//   try {
-//     await newOTPVerification.save();
-//     console.log("otp saved");
-//   } catch {
-//     console.log("error sending");
-//   }
-// };
+const sendOTPVerificationEmail = async (user) => {
+  //generate otp
+  const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
 
-// const sendOTPVerificationEmail = async (user) => {
-//   //generate otp
-//   const otp = `${Math.floor(1000 + Math.random() * 9000)}`;
+  await saveOTP(user, otp);
 
-//   await saveOTP(user, otp);
+  console.log(user, otp, "<<<<<<<");
 
-//   console.log(user, otp, "<<<<<<<");
+  const message = {
+    from: process.env.EMAIL,
+    to: user.email, // CHANGE LATER to user.email
+    subject: "Trybae OTP",
+    html: `<h3>Hello ${user.username}</h3> <br/> <p>YOUR OTP FOR TRYBAE IS:</p> <br/> <h2><em> ${otp} </em></h2> <br>
+		<h3> if you did NOT request this otp, please contact support immediately </h3>`,
+  };
 
-//   const message = {
-//     from: process.env.EMAIL,
-//     to: user.email, // CHANGE LATER to user.email
-//     subject: "Trybae OTP",
-//     html: `<h3>Hello ${user.username}</h3> <br/> <p>YOUR OTP FOR TRYBAE IS:</p> <br/> <h2><em> ${otp} </em></h2> <br>
-// 		<h3> if you did NOT request this otp, please contact support immediately </h3>`,
-//   };
-
-//   transport.sendMail(message, (error, info) => {
-//     if (error) {
-//       console.log(error);
-//     } else {
-//       console.log(`Message sent: ${info.messageId}`);
-//     }
-//   });
-// };
+  transport.sendMail(message, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log(`Message sent: ${info.messageId}`);
+    }
+  });
+};
 
 // const delete_profile_pic = (req, res) => {
 //   const username = req.decoded["username"];
@@ -524,88 +577,91 @@ const signup = async (req, res) => {
 //   }
 // };
 
-// async function update_verification_status(username, cb) {
-//   let query = `UPDATE users SET email_verified = TRUE WHERE username = ?`;
+async function update_verification_status(username, cb) {
 
-//   Model.connection.query(query, [username], (error, results) => {
-//     if (error) {
-//       console.log(new Date());
-//       return cb(error);
-//     }
-//     cb(null, results);
-//   });
-// }
+  const {data, error} = await supabase
+  .from('users')
+  .update({email_verification_status: true})
+  .eq('username', username)
 
-// const resend_OTP = async (req, res) => {
-//   try {
-//     let { cred, type } = req.body;
-//     if (!cred || !type) {
-//       return res.send({
-//         status: "FAILURE",
-//         message: "Empty details are not allowed",
-//       });
-//     } else {
-//       if (type == "username") {
-//         getUserByUsername(cred, async (err, result) => {
-//           if (result && !err) {
-//             if (result.username !== cred) {
-//               return res.send({
-//                 status: "FAILURE",
-//                 message: "email or username mismatch",
-//               });
-//             } else {
-//               await sendOTPVerificationEmail({
-//                 username: cred,
-//                 email: result.email,
-//               });
-//               return res.send({
-//                 status: "SUCCESS",
-//                 message: "OTP sent!",
-//                 username: result.username,
-//               });
-//             }
-//           } else {
-//             return res.send({
-//               status: "FAILURE",
-//               message: "No account found with this username",
-//             });
-//           }
-//         });
-//       } else {
-//         getUserByEmail(cred, async (err, result) => {
-//           if (result && !err) {
-//             if (result.email !== cred) {
-//               return res.send({
-//                 status: "FAILURE",
-//                 message: "email or username mismatch",
-//               });
-//             } else {
-//               await sendOTPVerificationEmail({
-//                 username: result.username,
-//                 email: cred,
-//               });
-//               return res.send({
-//                 status: "SUCCESS",
-//                 message: "OTP sent!",
-//                 username: result.username,
-//               });
-//             }
-//           } else {
-//             return res.send({
-//               status: "FAILURE",
-//               message: "No account found with this email",
-//             });
-//           }
-//         });
-//       }
-//     }
-//   } catch (error) {
-//     return res.send({
-//       status: "FAILED",
-//       message: "Unknown error",
-//     });
-//   }
-// };
+  if(error){
+    console.log(new Date());
+    return cb(error);
+  } else {
+    cb(null, data);
+  }
+}
+
+const resend_OTP = async (req, res) => {
+  try {
+    let { cred, type } = req.body;
+    if (!cred || !type) {
+      return res.send({
+        status: "FAILURE",
+        message: "Empty details are not allowed",
+      });
+    } else {
+      if (type == "username") {
+        getUserByUsername(cred, async (err, result) => {
+          if (result && !err) {
+            if (result.username !== cred) {
+              return res.send({
+                status: "FAILURE",
+                message: "email or username mismatch",
+              });
+            } else {
+              await sendOTPVerificationEmail({
+                username: cred,
+                email: result.email,
+              });
+              return res.send({
+                status: "SUCCESS",
+                message: "OTP sent!",
+                username: result.username,
+              });
+            }
+          } else {
+            return res.send({
+              status: "FAILURE",
+              message: "No account found with this username",
+            });
+          }
+        });
+      } else {
+        getUserByEmail(cred, async (err, result) => {
+          if (result && !err) {
+            if (result.email !== cred) {
+              return res.send({
+                status: "FAILURE",
+                message: "email or username mismatch",
+              });
+            } else {
+              await sendOTPVerificationEmail({
+                username: result.username,
+                email: cred,
+              });
+              return res.send({
+                status: "SUCCESS",
+                message: "OTP sent!",
+                username: result.username,
+              });
+            }
+          } else {
+            return res.send({
+              status: "FAILURE",
+              message: "No account found with this email",
+            });
+          }
+        });
+      }
+    }
+  } catch (error) {
+    return res.send({
+      status: "FAILED",
+      message: "Unknown error",
+    });
+  }
+};
 
 // const reset_Password = async (req, res) => {
 //   try {
@@ -738,112 +794,116 @@ const signup = async (req, res) => {
 //   }
 // }
 
-// async function getsociallinks(req, res) {
-//   const username = req.body.username;
+async function getsociallinks(req, res) {
+  const username = req.body.username;
 
-//   if (!username) {
-//     return res.send({ status: "FAILURE", message: "empty fields" });
-//   } else {
-//     try {
-//       const result = await mongodb.User_Social_Links.find({
-//         user_id: username,
-//       });
+  if (!username) {
+    return res.send({ status: "FAILURE", message: "empty fields" });
+  } else {
+    try {
+      const result = await mongodb.User_Social_Links.find({
+        user_id: username,
+      });
 
-//       if (result?.length < 1) {
-//         return res.send({
-//           status: "FAILURE",
-//           message: "Social links for user not found",
-//         });
-//       } else {
-//         return res.send({ status: "SUCCESS", data: result });
-//       }
-//     } catch (err) {
-//       return res.send({
-//         status: "FAILURE",
-//         message: "Unknown error",
-//       });
-//     }
-//   }
-// }
+      if (result?.length < 1) {
+        return res.send({
+          status: "FAILURE",
+          message: "Social links for user not found",
+        });
+      } else {
+        return res.send({ status: "SUCCESS", data: result });
+      }
+    } catch (err) {
+      return res.send({
+        status: "FAILURE",
+        message: "Unknown error",
+      });
+    }
+  }
+}
 
-// async function uploadSociallinks(req, res) {
-//   const { links } = req.body;
+async function uploadSociallinks(req, res) {
+  const { links } = req.body;
 
-//   console.log(links);
+  console.log(links);
 
-//   const username = req.decoded["username"];
+  const username = req.decoded["username"];
 
-//   if (!username || !links[0]?.link) {
-//     return res.send({ status: "FAILURE", message: "empty fields" });
-//   }
+  if (!username || !links[0]?.link) {
+    return res.send({ status: "FAILURE", message: "empty fields" });
+  }
 
-//   if (links?.length < 2 || links?.length > 3) {
-//     return res.send({
-//       status: "FAILURE",
-//       message: "Only up to 3 links allowed and 2 minimum, otherwise keep none.",
-//     });
-//   }
+  if (links?.length < 2 || links?.length > 3) {
+    return res.send({
+      status: "FAILURE",
+      message: "Only up to 3 links allowed and 2 minimum, otherwise keep none.",
+    });
+  }
 
-//   const found = await mongodb.User_Social_Links.find({
-//     user_id: username,
-//   });
+  const found = await mongodb.User_Social_Links.find({
+    user_id: username,
+  });
 
-//   if (found?.length > 0) {
-//     await mongodb.User_Social_Links.deleteMany({
-//       user_id: username,
-//     });
-//   }
+  if (found?.length > 0) {
+    await mongodb.User_Social_Links.deleteMany({
+      user_id: username,
+    });
+  }
 
-//   try {
-//     for (let j = 0; j < links?.length; j++) {
-//       if (!username || !links[j].link || !links[j].appname) {
-//         return res.send({
-//           status: "FAILURE",
-//           message: "Missing details in one of the links",
-//         });
-//       } else {
-//         const social_link = new mongodb.User_Social_Links({
-//           user_id: username,
-//           app_name: links[j].appname,
-//           social_link: links[j].link,
-//         });
+  try {
+    for (let j = 0; j < links?.length; j++) {
+      if (!username || !links[j].link || !links[j].appname) {
+        return res.send({
+          status: "FAILURE",
+          message: "Missing details in one of the links",
+        });
+      } else {
+        const social_link = new mongodb.User_Social_Links({
+          user_id: username,
+          app_name: links[j].appname,
+          social_link: links[j].link,
+        });
 
-//         await social_link.save();
-//       }
-//     }
-//     return res.send({
-//       status: "SUCCESS",
-//       message: `Saved your links successfully`,
-//     });
-//   } catch (err) {
-//     return res.send({
-//       status: "FAILURE",
-//       message: "Unknown error",
-//     });
-//   }
-// }
+        await social_link.save();
+      }
+    }
+    return res.send({
+      status: "SUCCESS",
+      message: `Saved your links successfully`,
+    });
+  } catch (err) {
+    return res.send({
+      status: "FAILURE",
+      message: "Unknown error",
+    });
+  }
+}
 
-// async function deleteSocialLinks(req, res) {
-//   const username = req.decoded["username"];
+async function deleteSocialLinks(req, res) {
+  const username = req.decoded["username"];
 
-//   if (!username) {
-//     return res.send({ status: "FAILURE", message: "Missing details" });
-//   } else {
-//     try {
-//       await mongodb.User_Social_Links.deleteMany({ user_id: username });
+  if (!username) {
+    return res.send({ status: "FAILURE", message: "Missing details" });
+  } else {
+    try {
+      await mongodb.User_Social_Links.deleteMany({ user_id: username });
 
-//       return res.send({
-//         status: "SUCCESS",
-//         message: "Deleted all links!",
-//       });
-//     } catch (err) {
-//       return res.send({
-//         status: "FAILURE",
-//         message: "Unknown error Try later",
-//       });
-//     }
-//   }
-// }
+      return res.send({
+        status: "SUCCESS",
+        message: "Deleted all links!",
+      });
+    } catch (err) {
+      return res.send({
+        status: "FAILURE",
+        message: "Unknown error Try later",
+      });
+    }
+  }
+}
+
+function appcheck (req, res) {
+  res.send(200)
+}
 
 // async function deleteAccount(req, res) {
 //   const username = req.decoded["username"];
@@ -888,74 +948,75 @@ const signup = async (req, res) => {
 //   }
 // }
 
-// async function verifyOTP(req, res) {
-//   try {
-//     let { userId, otp } = req.body;
-//     if (!userId || !otp) {
-//       return res.send({ status: "FAILED", message: "Empty details!" });
-//     } else {
-//       const UserEmailOTPVerificationRecord =
-//         await mongodb.UserEmailOTPVerification.find({
-//           userId,
-//         });
-//       if (UserEmailOTPVerificationRecord.length <= 0) {
-//         // no record found
-//         return res.send({ status: "FAILED", message: "Account doesnt exist" });
-//       } else {
-//         // user otp record exists
-//         const { expiresAt } = UserEmailOTPVerificationRecord[0];
-//         const hashedOTP = UserEmailOTPVerificationRecord[0].otp;
+async function verifyOTP(req, res) {
+  try {
+    let { userId, otp } = req.body;
+    if (!userId || !otp) {
+      return res.send({ status: "FAILED", message: "Empty details!" });
+    } else {
+      const UserEmailOTPVerificationRecord =
+        await mongodb.UserEmailOTPVerification.find({
+          userId,
+        });
+      if (UserEmailOTPVerificationRecord.length <= 0) {
+        // no record found
+        return res.send({ status: "FAILED", message: "Account doesnt exist" });
+      } else {
+        // user otp record exists
+        const { expiresAt } = UserEmailOTPVerificationRecord[0];
+        const hashedOTP = UserEmailOTPVerificationRecord[0].otp;
 
-//         if (expiresAt < Date.now()) {
-//           // user otp record has expired
-//           mongodb.UserEmailOTPVerification.deleteMany({ userId });
-//           return res.send({ status: "FAILED", message: "OTP Code Expired!" });
-//         } else {
-//           bcrypt.compare(otp, hashedOTP, (error, result) => {
-//             if (result && !error) {
-//               mongodb.UserEmailOTPVerification.deleteMany({ userId });
-//               update_verification_status(userId, (err, result) => {
-//                 if (err) {
-//                   return res.send({ message: "Error Verifying user" });
-//                 } else {
-//                   return res.send({
-//                     status: "SUCCESS",
-//                     message: "User email verified successfully.",
-//                   });
-//                 }
-//               });
-//             } else {
-//               // supplied otp is wrong
-//               return res.send({ status: "FAILED", message: "Invalid Code" });
-//             }
-//           });
-//         }
-//       }
-//     }
-//   } catch (error) {
-//     res.json({
-//       status: "FAILED",
-//       message: "Unknown error, try later.",
-//     });
-//   }
-// }
+        if (expiresAt < Date.now()) {
+          // user otp record has expired
+          mongodb.UserEmailOTPVerification.deleteMany({ userId });
+          return res.send({ status: "FAILED", message: "OTP Code Expired!" });
+        } else {
+          bcrypt.compare(otp, hashedOTP, (error, result) => {
+            if (result && !error) {
+              mongodb.UserEmailOTPVerification.deleteMany({ userId });
+              update_verification_status(userId, (err, result) => {
+                if (err) {
+                  return res.send({ message: "Error Verifying user" });
+                } else {
+                  return res.send({
+                    status: "SUCCESS",
+                    message: "User email verified successfully.",
+                  });
+                }
+              });
+            } else {
+              // supplied otp is wrong
+              return res.send({ status: "FAILED", message: "Invalid Code" });
+            }
+          });
+        }
+      }
+    }
+  } catch (error) {
+    res.json({
+      status: "FAILED",
+      message: "Unknown error, try later.",
+    });
+  }
+}
 
 module.exports = {
-  // login,
+  login,
+  appcheck,
   signup,
-  // verifyOTP,
-  // resend_OTP,
-  // refresh,
-  // update_push_token,
-  // upload_profile_pic,
-  // getuserData,
+  verifyOTP,
+  resend_OTP,
+  refresh,
+  update_push_token,
+  upload_profile_pic,
+  getuserData,
   // deleteAccount,
   // reset_Password,
-  // uploadSociallinks,
+  uploadSociallinks,
   // change_password,
   // edit_profile,
-  // getsociallinks,
+  getsociallinks,
   // change_to_private_profile,
-  // deleteSocialLinks,
+  deleteSocialLinks,
   // delete_profile_pic,
 };

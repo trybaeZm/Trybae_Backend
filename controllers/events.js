@@ -1,66 +1,73 @@
-const Model = require("../models/TryBae_db");
-const mysql = require("mysql2");
+const {supabase} = require("../models/TryBae_db");
 const mongo_db = require("../models/mongo_db");
 const { createMulter } = require("../middleware/multer-upload");
 
 // Select all events
-function getAllEvents(req, res) {
-  Model.connection.query("SELECT * FROM events", function (error, results) {
+async function getAllEvents(req, res) {
+const {error, data} = await supabase
+.from('events')
+.select('*')
+
     if (error) {
       res.send({ status: "FAILURE", message: "Unknown error" });
     } else {
       console.log(results, "results");
-      res.send({ status: "SUCCESS", results: results });
+      res.send({ status: "SUCCESS", results: data });
     }
-  });
 }
 
-function getAllNonFeaturedEvents(req, res) {
+async function getAllNonFeaturedEvents(req, res) {
   const eventType = req.query.eventType;
   if (eventType == undefined) {
-    Model.connection.query(
-      `SELECT * FROM events
-		WHERE event_id NOT IN (SELECT event_id FROM featured_events);`,
-      function (error, results) {
-        if (error) {
-          console.log(error, "error");
-          return res.send({ status: "FAILURE", message: "Unknown error" });
-        } else {
-          return res.send({ status: "SUCCESS", results: results });
-        }
-      }
-    );
+
+    const { error, data } = await supabase
+      .from('events')
+      .select('*')
+      .not('event_is', 'in',
+        supabase
+          .from('featured_events')
+          .select('event_type')
+      )
+    if (error) {
+      console.log(error, "error");
+      return res.send({ status: "FAILURE", message: "Unknown error" });
+    } else {
+      return res.send({ status: "SUCCESS", results: data });
+    }
+
   } else {
-    Model.connection.query(
-      `SELECT * FROM events
-      WHERE event_id NOT IN (SELECT event_id FROM featured_events)
-      AND category = ?;`,
-      [eventType],
-      function (error, results) {
-        if (error) {
-          console.log(error, "error");
-          return res.send({ status: "FAILURE", message: "Unknown error" });
-        } else {
-          return res.send({ status: "SUCCESS", results: results });
-        }
-      }
-    );
+
+    const { error, data } = await supabase
+      .from('events')
+      .select('*')
+      .not('event_is', 'in',
+        supabase
+          .from('featured_events')
+          .select('event_id')
+      )
+      .eq('category', eventType)
+
+    if (error) {
+      console.log(error, "error");
+      return res.send({ status: "FAILURE", message: "Unknown error" });
+    } else {
+      return res.send({ status: "SUCCESS", results: data });
+    }
   }
 }
 
-function getAllFeaturedEvents(req, res) {
-  Model.connection.query(
-    `SELECT * FROM featured_events
-		INNER JOIN events
-		ON featured_events.event_id = events.event_id;`,
-    function (error, results) {
+async function getAllFeaturedEvents(req, res) {
+
+  const {error, data} = await supabase
+  .from('featured_events')
+  .select('*, events(*)')
+  .eq('featured_events.event_id','events.event_id')
+
       if (error) {
         return res.send({ status: "FAILURE", message: "Unknown error" });
       } else {
-        return res.send({ status: "SUCCESS", results: results });
-      }
-    }
-  );
+        return res.send({ status: "SUCCESS", results: data });
+      }  
 }
 
 function uploadevent_image(req, res) {
@@ -182,20 +189,19 @@ async function Update_like_count(req, res) {
             mongo_db.eventLikes.updateOne(
               { event_id: id },
               { $push: { likers: username } },
-              function (err, event) {
+              
+              async function (err, event) {
                 if (!err && event) {
-                  Model.connection.query(
-                    "UPDATE events SET like_count = like_count + 1 WHERE event_id = ?",
-                    [id],
-                    function (error, results) {
+                  const {error, data} = await supabase
+                  .from('events')
+                  .update({'like_count': supabase.raw('like_count + 1')})
+                  .eq('event_id', id)
                       if (error) return res.send({ status: "FAILURE" });
                       else
                         return res.send({
                           status: "SUCCESS",
                           message: `liked event id ${id}`,
                         });
-                    }
-                  );
                 } else {
                   return res.send({
                     status: "FAILURE",
@@ -223,20 +229,19 @@ async function Update_like_count(req, res) {
           mongo_db.eventLikes.updateOne(
             { event_id: id },
             { $pull: { likers: username } },
-            function (err, event) {
+            async function (err, event) {
               if (!err && event) {
-                Model.connection.query(
-                  "UPDATE events SET like_count = like_count - 1 WHERE event_id = ?",
-                  [id],
-                  function (error, results) {
+                const {error, data} = await supabase
+                .from('events')
+                .update({like_count: supabase.raw('like_count - 1')})
+                .eq('event_is', id)
+                
                     if (error) return res.send({ status: "FAILURE" });
                     else
                       return res.send({
                         status: "SUCCESS",
                         message: `Unliked event id ${id}`,
                       });
-                  }
-                );
               } else {
                 return res.send({
                   status: "FAILURE",
@@ -268,13 +273,16 @@ async function getEvent_query(field, value, callback) {
     field,
     value,
   ]);
-  Model.connection.query(query, function (error, results) {
+
+  const {error, data} = await supabase
+  .from('events')
+  .select('*')
+  .eq(field, value)
     if (error) {
       callback(error, null);
     } else {
       callback(null, results[0]);
     }
-  });
 }
 
 // Add new event
@@ -318,23 +326,23 @@ async function addEvent(req, res) {
     event_passcode: passcode,
   };
 
-  Model.connection.query(
-    "INSERT INTO events SET ?",
-    event,
-    async function (error, results) {
-      if (error) res.send({ status: "FAILURE", message: "Unknown error" });
-      if (results) {
-        await setTicketTypes(results.insertId, "normal_price", normal_price);
-        res.send({
-          status: "SUCCESS",
-          message:
-            "successfully created event, keep the event passcode secure.",
-          event_name: event_name,
-          event_passcode: passcode,
-        });
-      }
-    }
-  );
+  const { error, data } = supabase
+    .from('events')
+    .insert([
+      event
+    ])
+
+  if (error) res.send({ status: "FAILURE", message: "Unknown error" });
+  if (data) {
+    await setTicketTypes(results.insertId, "normal_price", normal_price);
+    res.send({
+      status: "SUCCESS",
+      message:
+        "successfully created event, keep the event passcode secure.",
+      event_name: event_name,
+      event_passcode: passcode,
+    });
+  }
 }
 
 const setTicketTypes = async (event_id, ticket_type, ticket_price) => {
@@ -427,47 +435,45 @@ const setTicketTypesEndpoint = async (req, res) => {
 };
 
 // Update event by ID
-function updateEventQuery(field, value, event_id) {
-  Model.connection.query(
-    "UPDATE events SET ?? = ? WHERE event_id = ?",
-    [field, value, event_id],
-    function (err, results) {
-      if (err) throw err;
-    }
-  );
+async function updateEventQuery(field, value, event_id) {
+
+  const {error, data} = await supabase
+  .from('events')
+  .update([{field : value}])
+  .eq('event_id', event_id)
+  
+  if (error) throw err;
 }
 
 // Update event by ID
-function updateEvent(req, res) {
+async function updateEvent(req, res) {
   const id = req.body.id;
   const event = req.body;
-  Model.connection.query(
-    "UPDATE events SET ? WHERE event_id = ?",
-    [event, id],
-    function (error, results) {
+
+  const {error, data} = await supabase
+  .from('events')
+  .update(event)
+  .eq('event_id', id)
       if (error) {
         res.send({ status: "FAILURE", message: "Unknown error" });
       } else {
-        res.send({ status: "SUCCESS", results: results });
+        res.send({ status: "SUCCESS", results: data });
       }
-    }
-  );
 }
 
 // Delete event by ID
-function deleteEvent(req, res) {
+async function deleteEvent(req, res) {
   const id = req.body.id;
-  Model.connection.query(
-    "DELETE FROM events WHERE event_id = ?",
-    id,
-    function (error, results) {
-      if (error) {
+  const {error, data} = await supabase
+  .from('events')
+  .delete()
+  .eq('event_id', id)
+
+    if (error) {
         res.send({ status: "FAILURE", message: "Unknown error" });
       } else {
-        res.send({ status: "SUCCESS", results: results });
+        res.send({ status: "SUCCESS", results: data });
       }
-    }
-  );
 }
 
 function getHostEvents(req, res) {
@@ -481,18 +487,17 @@ function getHostEvents(req, res) {
   });
 }
 
-function getEvent_querys(fieldOne, valueOne, callback) {
-  const query = mysql.format("SELECT * FROM events WHERE ?? = ?", [
-    fieldOne,
-    valueOne,
-  ]);
-  Model.connection.query(query, function (error, results) {
+async function getEvent_querys(fieldOne, valueOne, callback) {
+  const {error, data} = await supabase
+  .from('events')
+  .select('*')
+  .eq(fieldOne, valueOne)
+
     if (error) {
       callback(error, null);
     } else {
-      callback(null, results);
+      callback(null, data);
     }
-  });
 }
 
 module.exports = {

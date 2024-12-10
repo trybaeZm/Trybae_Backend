@@ -1,17 +1,18 @@
 const express = require("express");
 const authController = require("../controllers/user_auth");
-// const middleware = require('../middleware/authtoken')
+const middleware = require('../middleware/authtoken')
 
 const router = express.Router();
 
-// router.post("/confirmjwt", middleware.confirmJWT);
+router.post("/confirmjwt", middleware.confirmJWT);
 
-// router.post("/login", authController.login);
+router.post("/login", authController.login);
 router.post("/signup", authController.signup);
-// router.post("/refresh", authController.refresh);
-// router.post("/verifyotp", authController.verifyOTP);
-// router.post("/resendotp", authController.resend_OTP);
-// router.post("/uploadprofilepic", middleware.verifyJWT, authController.upload_profile_pic);
+router.post("/refresh", authController.refresh);
+router.post("/verifyotp", authController.verifyOTP);
+router.post("/resendotp", authController.resend_OTP);
+router.get('/appcheck', authController.appcheck)
+router.post("/uploadprofilepic", middleware.verifyJWT, authController.upload_profile_pic);
 // router.post("/getuserdata", middleware.verifyJWT, authController.getuserData);
 // router.patch("/resetpassword", authController.reset_Password);
 // router.delete("/deleteaccount", middleware.verifyJWT, authController.deleteAccount);

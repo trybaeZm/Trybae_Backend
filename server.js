@@ -70,7 +70,7 @@ const userauthRouter = require("./routers/userauth_router");
 // const dashboardRouter = require("./routers/dashboard");
 // const couponsRouter = require("./routers/coupons_router");
 
-app.use("/userauth", userauthRouter);
+app.use("/userauth",limiter, userauthRouter);
 // app.use("/hostauth", limiter, hostauthRouter);
 // app.use("/tickets", limiter, ticketRouter);
 // app.use("/events", limiter, eventRouter);
@@ -88,9 +88,6 @@ app.use("/userauth", userauthRouter);
 
 // Test
 
-app.get("/appcheck", limiter, (req, res)=>{
-  res.send(200)
-})
 app.get("/s", limiter, (req, res) => {
   return res.send(
     `<body style='background-color: #000'><h1 style='color: white'>All services running ✅</h1></body>`

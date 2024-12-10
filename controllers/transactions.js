@@ -1,5 +1,5 @@
 const mongodb = require("../models/mongo_db");
-const Model = require("../models/TryBae_db");
+const { supabase } = require("../models/TryBae_db");
 const ticketController = require("./tickets");
 const Flutterwave = require("../middleware/flutterwave");
 const { Expo } = require("expo-server-sdk");
@@ -8,14 +8,17 @@ const { getUserObjects, sendNotificationToFollowers } = require("./followers");
 
 let expo = new Expo({ accessToken: process.env.EXPO_PUSH_ACCESS_TOKEN });
 
-const getUserByUsername = (username, cb) => {
-  const query = `SELECT * FROM users WHERE username = ?`;
-  Model.connection.query(query, [username], (error, results) => {
-    if (error) {
-      return cb(error);
-    }
-    cb(null, results[0]);
-  });
+const getUserByUsername = async (username, cb) => {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('username', username)
+    .single(); // Use .single() to fetch only one row
+
+  if (error) {
+    return cb(error);
+  }
+  cb(null, data); // `data` will be the user record
 };
 
 async function verify_transaction(req, res) {

@@ -1,4 +1,5 @@
 const Model = require("../models/TryBae_db");
+const { supabase } = require("../models/TryBae_db");
 const Flutterwave = require("../middleware/flutterwave");
 const mongodb = require("../models/mongo_db");
 const mysql = require("mysql2");
@@ -12,7 +13,7 @@ let expo = new Expo({ accessToken: process.env.EXPO_PUSH_ACCESS_TOKEN });
 
 const CONVENIENCE_FEE = 5; // IMPORTANT: 5 kwacha service cost / convenience fee...
 
-const create_ticket_query = (record, cb) => {
+const create_ticket_query = async (record, cb) => {
   const {
     ticket_owner,
     ticket_description,
@@ -29,11 +30,10 @@ const create_ticket_query = (record, cb) => {
   } = record;
 
   if (is_cinema_ticket == false) {
-    Model.connection.query(
-      `INSERT INTO tickets (ticket_id, ticket_owner, ticket_description, show_under_participants, event_id, 
-		ticket_type, Date_of_purchase, time_of_purchase, redeemed)
-        VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+    const {error, data} = await supabase
+    .from('tickets')
+    .insert([
+      {
         ticket_owner,
         ticket_description,
         show_under_participants,
@@ -42,22 +42,21 @@ const create_ticket_query = (record, cb) => {
         date_of_purchase,
         time_of_purchase,
         redeemed,
-      ],
-      (error, results) => {
+      }
+    ])
+    
+    
         if (error) {
           return cb(error);
         } else {
           // Send the results back to the client
-          cb(null, results);
+          cb(null, data);
         }
-      }
-    );
   } else {
-    Model.connection.query(
-      `INSERT INTO tickets (ticket_id, ticket_owner, ticket_description, show_under_participants, event_id, 
-		ticket_type, Date_of_purchase, time_of_purchase, redeemed, seat_number, cinema_time, cinema_date)
-        VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+    const {error, data} = await supabase
+    .from('tickets')
+    .insert([
+      {
         ticket_owner,
         ticket_description,
         show_under_participants,
@@ -69,16 +68,16 @@ const create_ticket_query = (record, cb) => {
         seat_number,
         cinema_time,
         cinema_date,
-      ],
-      (error, results) => {
+      }
+    ])
+    
         if (error) {
           return cb(error);
         }
+
         // Send the results back to the client
-        cb(null, results);
+        cb(null, data);
       }
-    );
-  }
 };
 
 function getCurrentTime() {
@@ -99,7 +98,7 @@ function getCurrentDate() {
   return `${year}-${month}-${day}`;
 }
 
-const hosttickets = (req, res) => {
+const hosttickets = async (req, res) => {
   const { event_id, seat_number, cinema_time, cinema_date } = req.body;
   const ticket_owner = req.decoded["username"];
 
@@ -120,97 +119,100 @@ const hosttickets = (req, res) => {
       cinema_date: cinema_date,
     };
 
-    Model.connection.query(
-      "INSERT INTO tickets SET ?",
-      hostticket,
-      (err, result) => {
+
+    const {error, data} = await supabase
+    .from('tickets')
+    .insert(hostticket)
+
         if (err) {
           return res.send({
             status: "FAILURE",
             message: `Error When updating seat: ${seat_number[index]}`,
           });
         }
-      }
-    );
-  }
+        
   res.send({
     status: "SUCCESS",
     message: `All Seats update successfully. refreash to see changes`,
   });
 };
 
-const delete_ticket_by_id_query = (ticket_id, cb) => {
-  Model.connection.query(
-    `DELETE FROM tickets WHERE ticket_id = ?`,
-    [ticket_id],
-    (error, results) => {
+}
+
+const delete_ticket_by_id_query = async (ticket_id, cb) => {
+
+  const {error, data} = await supabase
+  .from('tickets')
+  .delete()
+  .eq('ticket_id', ticket_id)
       if (error) {
         return cb(error);
       }
       // Send the results back to the client
-      cb(null, results);
+      cb(null, data);
     }
-  );
-};
+  
 
 // Update event by ID
-function updateTicketQuery(field, value, event_id) {
-  Model.connection.query(
-    "UPDATE tickets SET ?? = ? WHERE ticket_id = ?",
-    [field, value, event_id],
-    function (err, results) {
-      if (err) throw err;
-    }
-  );
+async function updateTicketQuery(field, value, event_id) {
+  const {error, data} = await supabase
+  .from('tickets')
+  .update({[field]:value})
+  .eq('ticket_id', event_id)
+      if (error) throw err;
 }
 
 // NOT APPLICABLE RN
 
-const get_all_user_tickets_query = (username, cb) => {
-  Model.connection.query(
-    `SELECT events.event_id AS events_event_id, events.event_name AS events_event_name, 
-		events.event_date AS events_event_date, events.event_time AS events_event_time, 
-		events.event_location AS events_event_location, events.About AS events_About, 
-		events.Image_url AS events_Image_url, events.Video_url AS events_Video_url, 
-		events.number_of_people AS events_number_of_people, events.host_username AS events_host_username, 
-		events.active AS events_active, events.normal_price AS events_normal_price, 
-		events.category AS events_category, events.like_count AS events_like_count, 
-		events.cinema_id AS events_cinema_id,
-		tickets.ticket_id AS tickets_ticket_id, tickets.ticket_owner AS tickets_ticket_owner, 
-		tickets.ticket_description AS tickets_ticket_description, 
-		tickets.show_under_participants AS tickets_show_under_participants, 
-		tickets.Date_of_purchase AS tickets_Date_of_purchase, 
-		tickets.time_of_purchase AS tickets_time_of_purchase, tickets.ticket_type AS tickets_ticket_type, 
-		tickets.cinema_time AS tickets_cinema_time, tickets.cinema_date AS tickets_cinema_date, tickets.seat_number AS tickets_seat_number,
-		tickets.redeemed AS tickets_redeemed
-		FROM events
-		JOIN tickets
-		ON events.event_id = tickets.event_id
-		WHERE tickets.ticket_owner = ?;
-		`,
-    [username],
-    (error, results) => {
-      if (error) {
-        return cb(error);
-      }
-      // Send the results back to the client
-      cb(null, results);
-    }
-  );
-};
+// const get_all_user_tickets_query = (username, cb) => {
+  
+//   Model.connection.query(
+//     `SELECT events.event_id AS events_event_id, events.event_name AS events_event_name, 
+// 		events.event_date AS events_event_date, events.event_time AS events_event_time, 
+// 		events.event_location AS events_event_location, events.About AS events_About, 
+// 		events.Image_url AS events_Image_url, events.Video_url AS events_Video_url, 
+// 		events.number_of_people AS events_number_of_people, events.host_username AS events_host_username, 
+// 		events.active AS events_active, events.normal_price AS events_normal_price, 
+// 		events.category AS events_category, events.like_count AS events_like_count, 
+// 		events.cinema_id AS events_cinema_id,
+// 		tickets.ticket_id AS tickets_ticket_id, tickets.ticket_owner AS tickets_ticket_owner, 
+// 		tickets.ticket_description AS tickets_ticket_description, 
+// 		tickets.show_under_participants AS tickets_show_under_participants, 
+// 		tickets.Date_of_purchase AS tickets_Date_of_purchase, 
+// 		tickets.time_of_purchase AS tickets_time_of_purchase, tickets.ticket_type AS tickets_ticket_type, 
+// 		tickets.cinema_time AS tickets_cinema_time, tickets.cinema_date AS tickets_cinema_date, tickets.seat_number AS tickets_seat_number,
+// 		tickets.redeemed AS tickets_redeemed
+// 		FROM events
+// 		JOIN tickets
+// 		ON events.event_id = tickets.event_id
+// 		WHERE tickets.ticket_owner = ?;
+// 		`,
+//     [username],
+//     (error, results) => {
+//       if (error) {
+//         return cb(error);
+//       }
+//       // Send the results back to the client
+//       cb(null, results);
+//     }
+//   );
+// };
 
-const get_user_ticket_by_id_query = (username, ticket_id, cb) => {
-  Model.connection.query(
-    "SELECT * FROM tickets WHERE ticket_owner = ? AND ticket_id = ?",
-    [username, ticket_id],
-    (error, results) => {
-      if (error) {
-        return cb(error);
-      }
-      // Send the results back to the client
-      cb(null, results);
-    }
-  );
+const get_user_ticket_by_id_query = async (username, ticket_id, cb) => {
+ 
+ const { error, data } = await supabase
+    .from('tickets')
+    .select('*')
+    .eq('ticket_owner', username)
+    .eq('ticket_id', ticket_id)
+    .single(); // Ensure only one ticket is fetched
+
+  if (error) {
+    return cb(error);
+  }
+
+  // Send the results back to the client
+  cb(null, data);
 };
 
 const delete_ticket_by_id = (req, res) => {
@@ -261,53 +263,58 @@ const delete_ticket_by_id = (req, res) => {
   }
 };
 
-const get_participants = (req, res) => {
+const get_participants = async (req, res) => {
   const { event_id } = req.body;
 
   if (!event_id) {
     res.send({ status: "FAILURE", message: "event id required" });
   }
 
-  const query = `SELECT DISTINCT tickets.ticket_owner, users.username, users.fullname, 
-	users.profile_pic_url, users.follower_count FROM tickets
-	JOIN users ON tickets.ticket_owner = users.username
-	WHERE tickets.event_id = ? AND show_under_participants = 1;`;
+  const { data, error } = await supabase
+  .from('tickets')
+  .select(`
+    DISTINCT ticket_owner,
+    users:ticket_owner (username, fullname, profile_pic_url, follower_count)
+  `)
+  .eq('event_id', event_id)
+  .eq('show_under_participants', 1);
 
-  Model.connection.query(query, [event_id], (err, results) => {
-    if (err) {
+    if (error) {
       res.send({ status: "FAILURE", message: "query failed" });
     }
-    if (results) {
-      res.send({ status: "SUCCESS", participants: results });
+    if (data) {
+      res.send({ status: "SUCCESS", participants: data });
     }
-  });
 };
 
-const redeem_ticket_query = (ticket_id, cb) => {
-  let query = `UPDATE tickets SET redeemed = 1 WHERE ticket_id = ?`;
+const redeem_ticket_query = async (ticket_id, cb) => {
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('*')
+    .eq('ticket_id', ticket_id)
+    .single(); // Use .single() if you expect only one row
 
-  Model.connection.query(query, [ticket_id], (err, results) => {
-    if (err) {
-      return cb(err);
-    }
-    // Send the results back to the client
-    cb(null, results);
-  });
+  if (error) {
+    return cb(error);
+  }
 };
 
-const check_if_redeemed_query = (ticket_id, cb) => {
-  let query = `SELECT redeemed from tickets WHERE ticket_id = ?`;
+const check_if_redeemed_query = async (ticket_id, cb) => {
 
-  Model.connection.query(query, [ticket_id], (err, result) => {
-    if (!err && result) {
-      return cb(null, result);
-    } else {
-      return cb(null);
-    }
-  });
+  const { data, error } = await supabase
+  .from('tickets')
+  .select('*')
+  .eq('ticket_id', ticket_id)
+  .single(); // Expecting only one result
+
+if (error) {
+  return cb(null); // Return null if there's an error
+}
+
+return cb(null, data); // Return the ticket data
 };
 
-const verify_ticket = (req, res) => {
+const verify_ticket = async (req, res)  => {
   try {
     const { ticket_id } = req.query;
 
@@ -318,25 +325,29 @@ const verify_ticket = (req, res) => {
       });
     }
 
-    const query = `SELECT * FROM tickets WHERE ticket_id = ?`;
 
-    Model.connection.query(query, [ticket_id], (err, results) => {
-      if (!err && results.length > 0) {
-        return res.send(
-          `<h2 style="color:green;">Ticket with id: <em>${ticket_id}</em> is valid and belongs to user: <em>${results[0].ticket_owner}</em></h2>`
-        );
-      } else {
-        return res.send(
-          `<h2 style="color:red;">Ticket not found, Report user immediately!</h2>`
-        );
-      }
-    });
+    const { data, error } = await supabase
+    .from('tickets')
+    .select('ticket_owner')
+    .eq('ticket_id', ticket_id)
+    .single(); // Expecting a single result
+
+  if (error || !data) {
+    return res.send(
+      `<h2 style="color:red;">Ticket not found, Report user immediately!</h2>`
+    );
+  }
+
+  return res.send(
+    `<h2 style="color:green;">Ticket with id: <em>${ticket_id}</em> is valid and belongs to user: <em>${data.ticket_owner}</em></h2>`
+  );
+
   } catch (err) {
     return res.send(`<h2>Try again in a short while or contact support.</h2>`);
   }
 };
 
-const bulk_verify_tickets = (req, res) => {
+const bulk_verify_tickets = async (req, res) => {
   try {
     const { event_id, username } = req.query;
 
@@ -347,19 +358,21 @@ const bulk_verify_tickets = (req, res) => {
       });
     }
 
-    const query = `SELECT * FROM tickets WHERE event_id = ? AND ticket_owner = ? AND redeemed = 0`;
+    const { data, error } = await supabase
+    .from('tickets')
+    .select('ticket_owner')
+    .eq('ticket_id', ticket_id)
+    .single(); // Expecting a single result
 
-    Model.connection.query(query, [event_id, username], (err, results) => {
-      if (!err && results.length > 0) {
+    if (!error && data.length > 0) {
         return res.send(
-          `<h2 style="color:green;">user: <em>${results[0]?.ticket_owner}</em> has ${results?.length} active ticket/s for this event.</h2>`
+          `<h2 style="color:green;">user: <em>${data[0]?.ticket_owner}</em> has ${data?.length} active ticket/s for this event.</h2>`
         );
       } else {
         return res.send(
-          `<h2 style="color:red;">User: <em>${results[0]?.ticket_owner}</em> has No active tickets for this event</h2>`
+          `<h2 style="color:red;">User: <em>${data[0]?.ticket_owner}</em> has No active tickets for this event</h2>`
         );
       }
-    });
   } catch (err) {
     return res.send(
       `<h2>Try again in a short while or contact support. ${err}</h2>`
@@ -967,6 +980,7 @@ const buy_cinema_ticket = async (req, res) => {
     }
   }
 };
+ 
 // const buy_cinema_ticket = async (req, res) => {
 //   const {
 //     ticket_owner,
@@ -1139,7 +1153,7 @@ const bulk_transfer = (req, res) => {
       message: "Invalid or missing details.",
     });
   } else {
-    getEvent_query("event_id", event_id, (err, found) => {
+    getEvent_query("event_id", event_id,async (err, found) => {
       if (!err && found) {
         // Date.prototype.cutHours = function (h) {
         // 	this.setHours(this.getHours() - h);
@@ -1165,30 +1179,36 @@ const bulk_transfer = (req, res) => {
         // } else {
         const query = `SELECT * FROM tickets WHERE event_id = ? AND ticket_owner = ? AND redeemed = 0`;
 
-        Model.connection.query(query, [event_id, username], (err, results) => {
-          if (err) {
+        const {error, data} = await supabase
+        .from('tickets')
+    .select('*')
+    .eq('event_id', event_id)
+    .eq('ticket_owner', ticket_owner)
+    .eq('redeemed', 0);
+
+          if (error) {
             return res.send({
               status: "FAILURE",
               message: "Unknown error, contact support",
             });
           }
-          if (results.length < qty) {
+          if (data.length < qty) {
             return res.send({
               status: "FAILURE",
               message: "Insufficeint tickets",
             });
           } else {
-            getUserByUsername(transfer_to, (err, founduser) => {
+            getUserByUsername(transfer_to, async (err, founduser) => {
               if (!err && founduser) {
                 let ticket_ids = results?.map((obj) => obj.ticket_id);
                 let query = `UPDATE tickets SET ticket_owner = ? WHERE ticket_id = ?`;
                 let completed = 0;
 
                 for (let i = 0; i < qty; i++) {
-                  Model.connection.query(
-                    query,
-                    [transfer_to, ticket_ids[i]],
-                    (err, done) => {
+                  const {error, data} = await supabase
+                  .from('tickets')
+                  .update({ticket_owner: transfer_to})
+                  .eq('ticket_id', ticket_ids)
                       if (!err && done) {
                         new_transfer_log(
                           {
@@ -1260,8 +1280,6 @@ const bulk_transfer = (req, res) => {
                         status: "SUCCESS",
                         message: `Transferred ${qty} tickets to ${transfer_to}`,
                       });
-                    }
-                  );
                 }
               } else {
                 return res.send({
@@ -1271,8 +1289,7 @@ const bulk_transfer = (req, res) => {
                 });
               }
             });
-          }
-        });
+        }
         // }
       } else {
         return res.send({ status: "FAILURE", message: "Event not found" });
@@ -1281,7 +1298,7 @@ const bulk_transfer = (req, res) => {
   }
 };
 
-const bulk_redeem = (req, res) => {
+const bulk_redeem = async (req, res) => {
   const { event_id, qty = 1, event_passcode } = req.body;
   const username = req.decoded["username"];
 
@@ -1300,9 +1317,12 @@ const bulk_redeem = (req, res) => {
     const passcode_check = `SELECT event_passcode FROM events WHERE event_id = ?`;
 
     try {
-      Model.connection.query(passcode_check, [event_id], (err, results) => {
-        if (!err && results) {
-          if (results[0].event_passcode != event_passcode) {
+const {error, data} = await supabase
+.from('events')
+select('event_passcode')
+.eq('event_id', event_id)
+        if (!error && data) {
+          if (data[0].event_passcode != event_passcode) {
             return res.send({
               status: "FAILURE",
               message: "Invalid event passcode",
@@ -1310,11 +1330,14 @@ const bulk_redeem = (req, res) => {
           } else {
             const query = `SELECT * FROM tickets WHERE event_id = ? AND ticket_owner = ? AND redeemed = 0`;
 
-            Model.connection.query(
-              query,
-              [event_id, username],
-              (err, result) => {
-                if (!err && qty <= result?.length) {
+            const {error, data} = await supabase
+              .from('tickets')
+              .select('*')
+              .eq('event_id', event_id)    // Filters by event_id
+              .eq('ticket_owner', username) // Filters by ticket_owner
+              .eq('redeemed', 0);  
+      
+                if (!error && qty <= data?.length) {
                   const query2 = `UPDATE tickets SET redeemed = 1 WHERE event_id = ? AND ticket_owner = ? AND redeemed = 0 LIMIT ${qty}`;
 
                   Model.connection.query(

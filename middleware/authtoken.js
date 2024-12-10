@@ -220,7 +220,6 @@ function verifyJWT(req, res, next) {
 		if (decoded.username != username) {
 			return res.status(404).send({ auth: false, message: "Token mismatch" }); // Token is not this users, but another users
 		}
-
 		req.decoded = decoded;
 		next();
 	});
@@ -229,11 +228,14 @@ function verifyJWT(req, res, next) {
 
 function confirmJWT(req, res) {
 	// Get the user's username from the decoded token
+	console.log('confirming jwt...')
 	const username = req.body["username"];
 	const token = req.body["trybae-access-token"];
+
 	if (!token) {
 		return res.status(401).send({ auth: false, message: "No token provided." });
 	}
+
 	// Verify the JWT and check that it is valid
 	jwt.verify(token, JWT_SECRET, (err, decoded) => {
 		if (err) {
