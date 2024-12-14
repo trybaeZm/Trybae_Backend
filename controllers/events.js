@@ -4,14 +4,14 @@ const { createMulter } = require("../middleware/multer-upload");
 
 // Select all events
 async function getAllEvents(req, res) {
+  console.log('getting events')
 const {error, data} = await supabase
 .from('events')
 .select('*')
-
     if (error) {
       res.send({ status: "FAILURE", message: "Unknown error" });
     } else {
-      console.log(results, "results");
+      // console.log(data, "results");
       res.send({ status: "SUCCESS", results: data });
     }
 }
@@ -287,10 +287,11 @@ async function getEvent_query(field, value, callback) {
 
 // Add new event
 async function addEvent(req, res) {
-  if (req.decoded.privs != "admin") {
-    return res.send({ status: "FAILURE", message: "insufficient priveleges" });
-  }
+  // if (req.decoded.privs != "admin") {
+  //   return res.send({ status: "FAILURE", message: "insufficient priveleges" });
+  // }
 
+  // console.log(req.body)
   const {
     event_name,
     event_time,
@@ -326,15 +327,17 @@ async function addEvent(req, res) {
     event_passcode: passcode,
   };
 
-  const { error, data } = supabase
+  const { error, data } = await supabase
     .from('events')
-    .insert([
-      event
-    ])
+    .insert(event)
+    .select()
 
-  if (error) res.send({ status: "FAILURE", message: "Unknown error" });
-  if (data) {
-    await setTicketTypes(results.insertId, "normal_price", normal_price);
+  if (error) {
+    console.log(error)
+    res.send({ status: "FAILURE", message: "Unknown error" });
+  } if(data) {
+    console.log(data)
+    await setTicketTypes(data[0].event_ID, "normal_price", normal_price);
     res.send({
       status: "SUCCESS",
       message:
@@ -343,7 +346,7 @@ async function addEvent(req, res) {
       event_passcode: passcode,
     });
   }
-}
+  }
 
 const setTicketTypes = async (event_id, ticket_type, ticket_price) => {
   try {
@@ -478,13 +481,15 @@ async function deleteEvent(req, res) {
 
 function getHostEvents(req, res) {
   const username = req.decoded["username"];
-  getEvent_querys("host_username", username, (error, results) => {
-    if (error) {
-      res.send({ status: "FAILURE", message: "Unkown error" });
-    } else {
-      res.send({ status: "SUCCESS", result: results });
-    }
-  });
+  getEvent_querys("host_username", username
+    // (error, results) => {
+    // if (error) {
+    //   res.send({ status: "FAILURE", message: "Unkown error" });
+    // } else {
+    //   res.send({ status: "SUCCESS", result: results });
+    // }
+  // }
+);
 }
 
 async function getEvent_querys(fieldOne, valueOne, callback) {
@@ -496,7 +501,8 @@ async function getEvent_querys(fieldOne, valueOne, callback) {
     if (error) {
       callback(error, null);
     } else {
-      callback(null, data);
+      // callback(null, data);
+      console.log('data')
     }
 }
 
