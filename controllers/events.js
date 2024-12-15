@@ -12,22 +12,34 @@ const {error, data} = await supabase
       res.send({ status: "FAILURE", message: "Unknown error" });
     } else {
       // console.log(data, "results");
-      res.send({ status: "SUCCESS", results: data });
+      res.send({ status: "SUCCESS", results: data});
     }
 }
 
 async function getAllNonFeaturedEvents(req, res) {
   const eventType = req.query.eventType;
-  if (eventType == undefined) {
+  
+  let EventIDs
 
+  const {data, error} = await supabase
+    .from('featured_events')
+    .select('event_ID')
+
+    if(error){
+      console.log(error)
+      return res.send({ status: "FAILURE", message: "Unknown error" });
+    }
+    if(data){
+      EventIDs = await data.map(e=>e.event_ID)
+      console.log(EventIDs)
+    }
+
+  if (eventType == undefined) {
     const { error, data } = await supabase
       .from('events')
       .select('*')
-      .not('event_is', 'in',
-        supabase
-          .from('featured_events')
-          .select('event_type')
-      )
+      .not('event_ID', 'in',`(${EventIDs.join(',')})`)
+
     if (error) {
       console.log(error, "error");
       return res.send({ status: "FAILURE", message: "Unknown error" });
@@ -39,13 +51,8 @@ async function getAllNonFeaturedEvents(req, res) {
 
     const { error, data } = await supabase
       .from('events')
-      .select('*')
-      .not('event_is', 'in',
-        supabase
-          .from('featured_events')
-          .select('event_id')
-      )
-      .eq('category', eventType)
+      .select('*', 'event_categories(*)')
+      .not()
 
     if (error) {
       console.log(error, "error");
@@ -53,17 +60,25 @@ async function getAllNonFeaturedEvents(req, res) {
     } else {
       return res.send({ status: "SUCCESS", results: data });
     }
-  }
+    }
 }
 
 async function getAllFeaturedEvents(req, res) {
+  console.log(req.query)
 
   const {error, data} = await supabase
-  .from('featured_events')
-  .select('*, events(*)')
-  .eq('featured_events.event_id','events.event_id')
+  .from('events')
+  .select('*')
+  .in('event_ID', 
+    (await supabase
+      .from('featured_events')
+      .select('event_ID')
+    ).data.map((e)=> e.event_ID)
+  )
+
 
       if (error) {
+        console.log(error)
         return res.send({ status: "FAILURE", message: "Unknown error" });
       } else {
         return res.send({ status: "SUCCESS", results: data });
@@ -269,11 +284,6 @@ async function getEventById(req, res) {
 }
 
 async function getEvent_query(field, value, callback) {
-  const query = mysql.format("SELECT * FROM events WHERE ?? = ?", [
-    field,
-    value,
-  ]);
-
   const {error, data} = await supabase
   .from('events')
   .select('*')
@@ -281,7 +291,7 @@ async function getEvent_query(field, value, callback) {
     if (error) {
       callback(error, null);
     } else {
-      callback(null, results[0]);
+      callback(null, data[0]);
     }
 }
 
@@ -481,14 +491,14 @@ async function deleteEvent(req, res) {
 
 function getHostEvents(req, res) {
   const username = req.decoded["username"];
-  getEvent_querys("host_username", username
-    // (error, results) => {
-    // if (error) {
-    //   res.send({ status: "FAILURE", message: "Unkown error" });
-    // } else {
-    //   res.send({ status: "SUCCESS", result: results });
-    // }
-  // }
+  getEvent_querys("host_username", username,
+    (error, results) => {
+    if (error) {
+      res.send({ status: "FAILURE", message: "Unkown error" });
+    } else {
+      res.send({ status: "SUCCESS", result: results });
+    }
+  }
 );
 }
 
@@ -501,7 +511,7 @@ async function getEvent_querys(fieldOne, valueOne, callback) {
     if (error) {
       callback(error, null);
     } else {
-      // callback(null, data);
+      callback(null, data);
       console.log('data')
     }
 }

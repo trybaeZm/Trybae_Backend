@@ -4,7 +4,7 @@ const middleware = require("../middleware/authtoken");
 
 const router = express.Router();
 
-router.use(middleware.verifyJWT);
+// router.use(middleware.verifyJWT);
 
 router.get("/getallEvents", eventController.getAllEvents);
 router.get("/getallnonfeaturedevents", eventController.getAllNonFeaturedEvents);
