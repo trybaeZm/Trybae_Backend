@@ -54,11 +54,11 @@ const createUser = async (
     .insert([
       {
         username: username,
-        full_name: fullname,
+        fullname: fullname,
         email: email,
         password: hashedPassword,
-        phone_number: phone,
-        date_of_birt: DOB,
+        phone: phone,
+        DOB: DOB,
         location: location
        },
     ])

@@ -33,34 +33,36 @@ async function getAllNonFeaturedEvents(req, res) {
       EventIDs = await data.map(e=>e.event_ID)
       console.log(EventIDs)
     }
-
-  if (eventType == undefined) {
-    const { error, data } = await supabase
-      .from('events')
-      .select('*')
-      .not('event_ID', 'in',`(${EventIDs.join(',')})`)
-
-    if (error) {
-      console.log(error, "error");
-      return res.send({ status: "FAILURE", message: "Unknown error" });
-    } else {
-      return res.send({ status: "SUCCESS", results: data });
+    if(EventIDs){
+      const { error, data } = await supabase
+        .from('events')
+        .select('*')
+        .not('event_ID', 'in',`(${EventIDs.join(',')})`)
+  
+      if (error) {
+        console.log(error, "error");
+        return res.send({ status: "FAILURE", message: "Unknown error" });
+      } else {
+        return res.send({ status: "SUCCESS", results: data });
+      }
     }
+    
+  // if (eventType == undefined) {
 
-  } else {
+  // } else {
 
-    const { error, data } = await supabase
-      .from('events')
-      .select('*', 'event_categories(*)')
-      .not()
+  //   const { error, data } = await supabase
+  //     .from('events')
+  //     .select('*', 'event_categories(*)')
+  //     .not()
 
-    if (error) {
-      console.log(error, "error");
-      return res.send({ status: "FAILURE", message: "Unknown error" });
-    } else {
-      return res.send({ status: "SUCCESS", results: data });
-    }
-    }
+  //   if (error) {
+  //     console.log(error, "error");
+  //     return res.send({ status: "FAILURE", message: "Unknown error" });
+  //   } else {
+  //     return res.send({ status: "SUCCESS", results: data });
+  //   }
+  //   }
 }
 
 async function getAllFeaturedEvents(req, res) {
@@ -75,8 +77,6 @@ async function getAllFeaturedEvents(req, res) {
       .select('event_ID')
     ).data.map((e)=> e.event_ID)
   )
-
-
       if (error) {
         console.log(error)
         return res.send({ status: "FAILURE", message: "Unknown error" });

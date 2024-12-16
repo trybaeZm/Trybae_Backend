@@ -229,29 +229,32 @@ function verifyJWT(req, res, next) {
 function confirmJWT(req, res) {
 	// Get the user's username from the decoded token
 	console.log('confirming jwt...')
-	const username = req.body["username"];
-	const token = req.body["trybae-access-token"];
 
-	if (!token) {
-		return res.status(401).send({ auth: false, message: "No token provided." });
+	if(req.body){
+		const username = req.body.username;
+		const token = req.body.trybaeAccessToken;
+		if (!token) {
+			return res.status(401).send({ auth: false, message: "No token provided." });
+		} else {
+			// Verify the JWT and check that it is valid
+			jwt.verify(token, JWT_SECRET, (err, decoded) => {
+				if (err) {
+					console.log(err.message )
+					return res.status(404).send({ auth: false, message: err.message });
+				}
+				if (decoded.exp < Date.now() / 1000) {
+					return res.status(401).send("JWT has expired");
+				}
+				// If the JWT is valid, save the decoded user information in the request object
+				// so that it is available for the next middleware function
+				if (decoded.username != username) {
+					return res.status(404).send({ auth: false, message: "Token mismatch" }); // Token is not this users, but another users
+				}
+				return res.send({ auth: true, message: "jwt valid and working" });
+			});
+		}
+	
 	}
-
-	// Verify the JWT and check that it is valid
-	jwt.verify(token, JWT_SECRET, (err, decoded) => {
-		if (err) {
-			return res.status(404).send({ auth: false, message: err.message });
-		}
-		if (decoded.exp < Date.now() / 1000) {
-			return res.status(401).send("JWT has expired");
-		}
-		// If the JWT is valid, save the decoded user information in the request object
-		// so that it is available for the next middleware function
-		if (decoded.username != username) {
-			return res.status(404).send({ auth: false, message: "Token mismatch" }); // Token is not this users, but another users
-		}
-
-		return res.send({ auth: true, message: "jwt valid and working" });
-	});
 }
 
 module.exports = {
